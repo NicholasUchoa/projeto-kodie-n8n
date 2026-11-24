@@ -1,0 +1,475 @@
+{
+  "name": "Classificador de Mensagens com IA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mensagem",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "classificador-mensagem"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n2-0",
+              "name": "mensagem",
+              "value": "={{ $json.body.mensagem }}",
+              "type": "string"
+            },
+            {
+              "id": "n2-1",
+              "name": "remetente",
+              "value": "={{ $json.body.remetente || 'não informado' }}",
+              "type": "string"
+            },
+            {
+              "id": "n2-2",
+              "name": "canal",
+              "value": "={{ $json.body.canal || 'webhook' }}",
+              "type": "string"
+            },
+            {
+              "id": "n2-3",
+              "name": "recebido_em",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "n2",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/classificar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { mensagem: $json.mensagem, remetente: $json.remetente, canal: $json.canal } }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "n3",
+      "name": "HTTP Request (API + IA)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-financeiro",
+                    "leftValue": "={{ $json.setor }}",
+                    "rightValue": "financeiro",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renamedOutput": true,
+              "outputKey": "Financeiro"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-suporte_tecnico",
+                    "leftValue": "={{ $json.setor }}",
+                    "rightValue": "suporte_tecnico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renamedOutput": true,
+              "outputKey": "Suporte Técnico"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-comercial",
+                    "leftValue": "={{ $json.setor }}",
+                    "rightValue": "comercial",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renamedOutput": true,
+              "outputKey": "Comercial"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Atendimento Geral"
+        }
+      },
+      "id": "n4",
+      "name": "Switch (por setor)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n5-0",
+              "name": "setor_destino",
+              "value": "Financeiro",
+              "type": "string"
+            },
+            {
+              "id": "n5-1",
+              "name": "canal_encaminhamento",
+              "value": "#fila-financeiro",
+              "type": "string"
+            },
+            {
+              "id": "n5-2",
+              "name": "email_destino",
+              "value": "financeiro@empresa.com",
+              "type": "string"
+            },
+            {
+              "id": "n5-3",
+              "name": "notificacao",
+              "value": "={{ '[' + $json.prioridade.toUpperCase() + '] ' + $json.categoria + ' de ' + ($json.remetente || 'cliente') + ': ' + $json.resumo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "n5",
+      "name": "Encaminhar Financeiro",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n6-0",
+              "name": "setor_destino",
+              "value": "Suporte Técnico",
+              "type": "string"
+            },
+            {
+              "id": "n6-1",
+              "name": "canal_encaminhamento",
+              "value": "#fila-suporte",
+              "type": "string"
+            },
+            {
+              "id": "n6-2",
+              "name": "email_destino",
+              "value": "suporte@empresa.com",
+              "type": "string"
+            },
+            {
+              "id": "n6-3",
+              "name": "notificacao",
+              "value": "={{ '[' + $json.prioridade.toUpperCase() + '] ' + $json.categoria + ' de ' + ($json.remetente || 'cliente') + ': ' + $json.resumo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "n6",
+      "name": "Encaminhar Suporte",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n7-0",
+              "name": "setor_destino",
+              "value": "Comercial",
+              "type": "string"
+            },
+            {
+              "id": "n7-1",
+              "name": "canal_encaminhamento",
+              "value": "#fila-comercial",
+              "type": "string"
+            },
+            {
+              "id": "n7-2",
+              "name": "email_destino",
+              "value": "comercial@empresa.com",
+              "type": "string"
+            },
+            {
+              "id": "n7-3",
+              "name": "notificacao",
+              "value": "={{ '[' + $json.prioridade.toUpperCase() + '] ' + $json.categoria + ' de ' + ($json.remetente || 'cliente') + ': ' + $json.resumo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "n7",
+      "name": "Encaminhar Comercial",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n8-0",
+              "name": "setor_destino",
+              "value": "Atendimento Geral",
+              "type": "string"
+            },
+            {
+              "id": "n8-1",
+              "name": "canal_encaminhamento",
+              "value": "#fila-atendimento",
+              "type": "string"
+            },
+            {
+              "id": "n8-2",
+              "name": "email_destino",
+              "value": "atendimento@empresa.com",
+              "type": "string"
+            },
+            {
+              "id": "n8-3",
+              "name": "notificacao",
+              "value": "={{ '[' + $json.prioridade.toUpperCase() + '] ' + $json.categoria + ' de ' + ($json.remetente || 'cliente') + ': ' + $json.resumo }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "n8",
+      "name": "Encaminhar Atendimento Geral",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        900,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "n9",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1140,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (API + IA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (API + IA)": {
+      "main": [
+        [
+          {
+            "node": "Switch (por setor)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch (por setor)": {
+      "main": [
+        [
+          {
+            "node": "Encaminhar Financeiro",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Encaminhar Suporte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Encaminhar Comercial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Encaminhar Atendimento Geral",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encaminhar Financeiro": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encaminhar Suporte": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encaminhar Comercial": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encaminhar Atendimento Geral": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
